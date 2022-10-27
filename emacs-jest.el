@@ -34,48 +34,48 @@
 (require 'dash)
 (require 'linum)
 (require 'projectile)
-(require 'helm-projectile)
+;; (require 'helm-projectile)
 
 ;;; Custom vars
-(defgroup jest nil
+(defgroup emacs-jest nil
   "Tools for running jest tests"
   :group 'tools)
 
-(defcustom jest-environment-vars nil
+(defcustom emacs-jest-environment-vars nil
   "Environment variables that get applied to all jest calls"
   :type 'string
-  :group 'jest)
+  :group 'emacs-jest)
 
-(defcustom jest-default-args nil
+(defcustom emacs-jest-default-args nil
   "Arguments that get applied to all jest calls"
   :type 'string
-  :group 'jest)
+  :group 'emacs-jest)
 
-(defcustom jest-coverage-default-args nil
+(defcustom emacs-jest-coverage-default-args nil
   "Arguments that get applied to all jest --coverage calls"
   :type 'string
-  :group 'jest)
+  :group 'emacs-jest)
 
-(defcustom jest-coverage-directory "coverage"
+(defcustom emacs-jest-coverage-directory "coverage"
   "The `coverageDirectory` value in your jest config file"
   :type 'string
-  :group 'jest)
+  :group 'emacs-jest)
 
 ;; TODO - save historical results as custom config
 ;; TODO - if ^ then make chart to show jest coverage change over time (per branch etc)
 
 ;;; General utils
-(defvar node-error-regexp
+(defvar emacs-jest-node-error-regexp
   "^[  ]+at \\(?:[^\(\n]+ \(\\)?\\(\\(?:[a-zA-Z]:\\)?[a-zA-Z\.0-9_/\\-]+\\):\\([0-9]+\\):\\([0-9]+\\)\)?"
   "Regular expression to match NodeJS errors.
 From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilation-mode/")
 
-(defvar node-error-regexp-alist
+(defvar emacs-jest-node-error-regexp-alist
   `((,node-error-regexp 1 2 3)))
 
 ;; Takes a buffer name and kills if exists
 ;; Also takes optional boolean to raise error if buffer exists instead of killing it
-(defun check-buffer-does-not-exist (buffer-name &optional error-if-exists)
+(defun emacs-jest-check-buffer-does-not-exist (buffer-name &optional error-if-exists)
   (let ((buffer-exists (get-buffer buffer-name)))
     (cond
      ((and buffer-exists error-if-exists)
@@ -85,19 +85,19 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 
 ;; Replaces in string
 ;; Graciously taken from https://stackoverflow.com/a/17325791/16587811
-(defun replace-in-string (what with in)
+(defun emacs-jest-replace-in-string (what with in)
   (replace-regexp-in-string (regexp-quote what) with in nil 'literal))
 
 ;; If whole number, returns as is
 ;; Otherwise formats up to two decimal places
-(defun format-decimal (value)
+(defun emacs-jest-format-decimal (value)
   (cond
    ((eq 0 value)
     "0%")
    (t
     (concat (format "%.4g" value) "%"))))
 
-(defun get-percentage (portion total)
+(defun emacs-jest-get-percentage (portion total)
   (cond
    ((eq 0 portion)
     (format-decimal 0))
@@ -108,50 +108,50 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
    (t
     (format-decimal (* 100 (/ (float portion) total))))))
 
-(defun last-character (str)
+(defun emacs-jest-last-character (str)
   (substring str -1 nil))
 
-(defun is-percentage (str)
+(defun emacs-jest-is-percentage (str)
   (string-equal (last-character str) "%"))
 
-(defun extract-percentage (percentage-string)
+(defun emacs-jest-extract-percentage (percentage-string)
   (string-to-number (substring percentage-string 0 -1)))
 
-(defun string-to-list (str)
+(defun emacs-jest-string-to-list (str)
   (mapcar 'char-to-string str))
 
-(defun index-of-first-deviating-character (str1 str2)
+(defun emacs-jest-index-of-first-deviating-character (str1 str2)
   (let ((zipped (-zip (string-to-list str1) (string-to-list str2))))
     (-find-index
      (lambda (x) (not (string-equal (car x) (cdr x))))
      zipped)))
 
-(defun pad-string-until-length (str desired-length)
+(defun emacs-jest-pad-string-until-length (str desired-length)
   (let* ((difference (- desired-length (length str)))
 	 (to-pad-left (/ difference 2))
 	 (to-pad-right (- difference to-pad-left)))
     (concat (make-string to-pad-left (string-to-char " ")) str (make-string to-pad-right (string-to-char " ")))))
 
-(defun truthy-string (str)
+(defun emacs-jest-truthy-string (str)
   (and str (> (length str) 0)))
 
 ;;; Related to the compilation buffer
-(defun jest-compilation-filter ()
+(defun emacs-jest-compilation-filter ()
   "Filter function for compilation output."
   (ansi-color-apply-on-region compilation-filter-start (point-max)))
 
-(defun jest-after-completion (buffer desc))
+(defun emacs-jest-after-completion (buffer desc))
 
-(define-compilation-mode jest-compilation-mode "Jest"
+(define-compilation-mode emacs-jest-compilation-mode "Jest"
   "Jest compilation mode."
   (progn
     (set (make-local-variable 'compilation-error-regexp-alist) node-error-regexp-alist)
-    (set (make-local-variable 'compilation-finish-functions) 'jest-after-completion)
-    (add-hook 'compilation-filter-hook 'jest-compilation-filter nil t)
+    (set (make-local-variable 'compilation-finish-functions) 'emacs-jest-after-completion)
+    (add-hook 'compilation-filter-hook 'emacs-jest-compilation-filter nil t)
     ))
 
 ;;; Related to actually running jest
-(defun get-jest-executable ()
+(defun emacs-jest-get-jest-executable ()
   (let ((project-provided-jest-path (concat default-directory "node_modules/.bin/jest")))
     (cond
      ;; Check to see if an executable exists within the `default-directory` value
@@ -161,33 +161,33 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
      ;; Otherwise we throw an error
      (t (error "Failed to find jest executable")))))
 
-(defun with-coverage-args (&optional arguments)
+(defun emacs-jest-with-coverage-args (&optional arguments)
   (let* ((minimum-args (list "--coverage"))
-	 (with-default-args (if (truthy-string jest-coverage-default-args)
-				(append minimum-args (list jest-coverage-default-args))
+	 (with-default-args (if (truthy-string emacs-jest-coverage-default-args)
+				(append minimum-args (list emacs-jest-coverage-default-args))
 			      minimum-args))
 	 (with-args (if (truthy-string arguments)
 			(append arguments with-default-args)
 		      with-default-args)))
     with-args))
 
-(defun get-jest-arguments (&optional arguments)
+(defun emacs-jest-get-jest-arguments (&optional arguments)
   (if arguments
       (string-join
        (flatten-list
 	(list
-	 jest-environment-vars
+	 emacs-jest-environment-vars
 	 arguments
-	 jest-default-args)) " ")
+	 emacs-jest-default-args)) " ")
     ""))
 
 ;; Takes optional list of tuples and applies them to jest command
-(defun generate-jest-command (&optional arguments)
-  (let ((jest-executable (get-jest-executable))
-	(jest-arguments (get-jest-arguments arguments)))
+(defun emacs-jest-generate-jest-command (&optional arguments)
+  (let ((jest-executable (emacs-jest-get-jest-executable))
+	(jest-arguments (emacs-jest-get-jest-arguments arguments)))
     (string-join `(,jest-executable ,jest-arguments) " ")))
 
-(defun run-jest-command (&optional arguments)
+(defun emacs-jest-run-jest-command (&optional arguments)
   ;; Check there are no unsaved buffers
   (save-some-buffers (not compilation-ask-about-save)
                      (when (boundp 'compilation-save-buffers-predicate)
@@ -207,43 +207,43 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
       (switch-to-buffer "*jest tests*")
       (let ((default-directory target-directory) (compilation-scroll-output t))
 	(compilation-start
-	 (generate-jest-command arguments)
-	 'jest-compilation-mode
+	 (emacs-jest-generate-jest-command arguments)
+	 'emacs-jest-compilation-mode
 	 (lambda (m) (buffer-name)))))))
 
-(defun jest-test-file (&optional filename)
+(defun emacs-jest-test-file (&optional filename)
   (interactive)
   (cond
    ((not filename)
     (let ((helm-projectile-sources-list
 	   '(helm-source-projectile-buffers-list
 	     helm-source-projectile-files-list)))
-      (noflet ((helm-find-file-or-marked (candidate) (jest-test-file candidate))
-	       (helm-buffer-switch-buffers (candidate) (jest-test-file (buffer-file-name candidate))))
+      (noflet ((helm-find-file-or-marked (candidate) (emacs-jest-test-file candidate))
+	       (helm-buffer-switch-buffers (candidate) (emacs-jest-test-file (buffer-file-name candidate))))
 	(helm-projectile))))
    ((file-exists-p filename)
-    (run-jest-command `(,filename)))
+    (emacs-jest-run-jest-command `(,filename)))
    (t
     (error "Invalid file provided"))))
 
-(defun jest-test-current-file ()
+(defun emacs-jest-test-current-file ()
   (interactive)
-  (jest-test-file buffer-file-name))
+  (emacs-jest-test-file buffer-file-name))
 
-(defun jest-test-directory (&optional directory)
+(defun emacs-jest-test-directory (&optional directory)
   (interactive)
   (unless directory (setq directory (read-directory-name "Test directory:")))
-  (run-jest-command `(,directory)))
+  (emacs-jest-run-jest-command `(,directory)))
 
-(defun jest-test-current-directory ()
+(defun emacs-jest-test-current-directory ()
   (interactive)
-  (jest-test-directory default-directory))
+  (emacs-jest-test-directory default-directory))
 
-(defun jest-test-coverage ()
+(defun emacs-jest-test-coverage ()
   (interactive)
-  (run-jest-command (with-coverage-args)))
+  (emacs-jest-run-jest-command (with-coverage-args)))
 
-(defun present-coverage-as-org-table (columns table)
+(defun emacs-jest-present-coverage-as-org-table (columns table)
   (insert (concat "|" (string-join columns "|") "|"))
   (newline)
 
@@ -272,7 +272,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
   ;; Moving to start of file
   (beginning-of-buffer))
 
-(defun present-coverage-as-table (title columns table &optional table-type)
+(defun emacs-jest-present-coverage-as-table (title columns table &optional table-type)
   (when (= (length columns) 0)
     (error "Invalid columns passed in"))
 
@@ -283,7 +283,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
       (switch-to-buffer desired-buffer-name)
       (present-coverage-as-org-table columns table))))
 
-(defun get-highlight-color-from-percentage (value)
+(defun emacs-jest-get-highlight-color-from-percentage (value)
   (cond
    ((>= value 80)
     "green")
@@ -292,7 +292,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
    (t
     "red")))
 
-(defun add-coverage-table-color-indicators ()
+(defun emacs-jest-add-coverage-table-color-indicators ()
   (interactive)
   (let* ((tree (org-element-parse-buffer))
          (tables (org-element-map tree 'table 'identity)))
@@ -306,14 +306,14 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		   (color-to-apply (get-highlight-color-from-percentage percentage)))
 	      (hlt-highlight-region cell-start cell-end `((t (:foreground "black" :background ,color-to-apply)))))))))))
 
-(defun format-meta-category-stat (category-element)
+(defun emacs-jest-format-meta-category-stat (category-element)
   (let* ((info-elements (dom-by-tag category-element 'span))
 	 (info-texts (mapcar 'dom-text info-elements)))
     (concat (first info-texts) (second info-texts) " (" (third info-texts) ")")))
 
 ;; This takes an lcov-report HTML and returns
 ;; ("<title>", "X% <category> (M/N)", "X% <category> (M/N)", "X% <category> (M/N)")
-(defun jest-parse--lcov-report-meta (lcov-report-html)
+(defun emacs-jest-parse--lcov-report-meta (lcov-report-html)
   (let* ((title-text (dom-text (first (dom-by-tag lcov-report-html 'h1))))
 	 (trimmed-title-text (string-join
 			      (-filter
@@ -334,29 +334,29 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 			  ", ")))
     (list title category-stats)))
 
-(defun jest-parse--lcov-report-row-identifier (lcov-report-row)
+(defun emacs-jest-parse--lcov-report-row-identifier (lcov-report-row)
   (let* ((a-tag (first (dom-by-tag lcov-report-row 'a)))
 	 (a-href (dom-attr a-tag 'href)))
     (if (string-suffix-p "index.html" a-href)
 	(substring a-href 0 -10)
       (substring a-href 0 -5))))
 
-(defun jest-parse--lcov-report-row (lcov-report-row)
-  (let ((identifier (jest-parse--lcov-report-row-identifier lcov-report-row))
+(defun emacs-jest-parse--lcov-report-row (lcov-report-row)
+  (let ((identifier (emacs-jest-parse--lcov-report-row-identifier lcov-report-row))
 	(data (mapcar 'dom-text (cdr (cdr (dom-by-tag lcov-report-row 'td))))))
     (append (list identifier) data)))
 
 ;; Takes the lcov-report HTML and returns the rows to be rendered in a table
 ;; (("<identifier", "X%", "A/B", "Y%", "C/D"...),
 ;;  ("<identifier", "X%", "A/B", "Y%", "C/D"...)...)
-(defun jest-parse--lcov-report-rows (lcov-report-html)
+(defun emacs-jest-parse--lcov-report-rows (lcov-report-html)
   (let* ((table-body (first (dom-by-tag lcov-report-html 'tbody)))
 	 (table-rows (dom-by-tag table-body 'tr)))
-    (mapcar 'jest-parse--lcov-report-row table-rows)))
+    (mapcar 'emacs-jest-parse--lcov-report-row table-rows)))
 
-(defun jest-parse--lcov-report-summary (lcov-report-html)
-  (let ((meta (jest-parse--lcov-report-meta lcov-report-html))
-	(rows (jest-parse--lcov-report-rows lcov-report-html)))
+(defun emacs-jest-parse--lcov-report-summary (lcov-report-html)
+  (let ((meta (emacs-jest-parse--lcov-report-meta lcov-report-html))
+	(rows (emacs-jest-parse--lcov-report-rows lcov-report-html)))
     (let ((desired-buffer-name (concat "coverage <" (first meta) ">")))
       (check-buffer-does-not-exist desired-buffer-name)
 
@@ -375,7 +375,7 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 	 (list "File" "Statements Covered" "Statements" "Branches Covered" "Branches" "Functions Covered" "Functions" "Lines Covered" "Lines")
 	 rows)))))
 
-(defun get-relevant-cline-class (dom-element)
+(defun emacs-jest-get-relevant-cline-class (dom-element)
   (let ((classes (dom-attr dom-element 'class)))
     (cond
      ((string-match-p (regexp-quote "cline-no") classes)
@@ -383,11 +383,11 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
      ((string-match-p (regexp-quote "cline-yes") classes)
       "cline-yes"))))
 
-(defun format-line-annotation-content (dom-element)
+(defun emacs-jest-format-line-annotation-content (dom-element)
   (replace-in-string "\u00A0" "" (dom-text dom-element)))
 
 ;; TODO - define minor mode to handle interactions + syntax highlighting
-(defun jest-parse--lcov-report-file (lcov-report-html)
+(defun emacs-jest-parse--lcov-report-file (lcov-report-html)
   (let* ((td-elements (dom-by-tag lcov-report-html 'td))
 	 (line-coverage-section (second td-elements))
 	 (obtained-line-coverage-items (dom-by-tag line-coverage-section 'span))
@@ -475,12 +475,12 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
       (delete-backward-char 2)
       (beginning-of-buffer))))
 
-(defun jest-parse--lcov-report (lcov-report-html)
+(defun emacs-jest-parse--lcov-report (lcov-report-html)
   (if (dom-by-class lcov-report-html "coverage-summary")
-      (jest-parse--lcov-report-summary lcov-report-html)
-    (jest-parse--lcov-report-file lcov-report-html)))
+      (emacs-jest-parse--lcov-report-summary lcov-report-html)
+    (emacs-jest-parse--lcov-report-file lcov-report-html)))
 
-(defun jest-parse--lcov-report-target (&optional target)
+(defun emacs-jest-parse--lcov-report-target (&optional target)
   (let* ((target-file (cond
 		      ((null target)
 		       "index.html")
@@ -488,27 +488,27 @@ From http://benhollis.net/blog/2015/12/20/nodejs-stack-traces-in-emacs-compilati
 		       (concat target "index.html"))
 		      (t
 		       (concat target ".html"))))
-	 (target-filepath (concat (projectile-project-root) jest-coverage-directory "/" target-file))
+	 (target-filepath (concat (projectile-project-root) emacs-jest-coverage-directory "/" target-file))
 	 (xml-dom-tree (with-temp-buffer
 			   (insert-file-contents target-filepath)
 			   (libxml-parse-html-region (point-min) (point-max)))))
-    (jest-parse--lcov-report xml-dom-tree)))
+    (emacs-jest-parse--lcov-report xml-dom-tree)))
 
-(defun jest-get-coverage ()
+(defun emacs-jest-get-coverage ()
   (interactive)
-  (jest-parse--lcov-report-target))
+  (emacs-jest-parse--lcov-report-target))
 
-(defun parse--coverage-target-from-buffer (target)
+(defun emacs-jest-parse--coverage-target-from-buffer (target)
   (if (string-match-p (regexp-quote "<All files>") (buffer-name))
       target
     (concat (substring (buffer-name) (+ 1 (string-match-p (regexp-quote "<") (buffer-name))) -1) target)))
 
-(defun get-target-coverage ()
+(defun emacs-jest-get-target-coverage ()
   (interactive)
   (when (org-table-p)
     (let* ((row-identifier (org-table-get nil 1))
 	   (identifier (parse--coverage-target-from-buffer row-identifier)))
-      (jest-parse--lcov-report-target identifier))))
+      (emacs-jest-parse--lcov-report-target identifier))))
 
 (global-unset-key (kbd "C-c c"))
 (global-set-key (kbd "C-c c") 'get-target-coverage)
